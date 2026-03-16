@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #E8E2D9; width: 100%; height: 100%; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+  :root {
+    --color-background-primary: #E8E2D9;
+    --color-background-secondary: #E0D9CE;
+    --color-border-primary: #1A1814;
+    --color-border-secondary: #C8BFB0;
+    --color-text-primary: #1A1814;
+    --color-text-secondary: #7A7268;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+  .sm-wrap{display:flex;align-items:center;justify-content:center;padding:2rem 1rem}
+  .machine{display:flex;gap:10px;align-items:center;background:var(--color-background-secondary);border:1.5px solid var(--color-border-secondary);border-radius:14px;padding:18px 22px;position:relative}
+  .reel-outer{width:52px;height:120px;overflow:hidden;border-radius:8px;border:1.5px solid var(--color-border-secondary);background:var(--color-background-primary);position:relative}
+  .reel-outer::before,.reel-outer::after{content:'';position:absolute;left:0;right:0;height:36px;z-index:2;pointer-events:none}
+  .reel-outer::before{top:0;background:linear-gradient(to bottom,var(--color-background-primary) 0%,transparent 100%)}
+  .reel-outer::after{bottom:0;background:linear-gradient(to top,var(--color-background-primary) 0%,transparent 100%)}
+  .reel-window{position:absolute;top:50%;left:0;right:0;height:42px;transform:translateY(-50%);border-top:1.5px solid var(--color-border-primary);border-bottom:1.5px solid var(--color-border-primary);z-index:1;pointer-events:none}
+  .reel-track{position:absolute;left:0;right:0;top:0;display:flex;flex-direction:column;align-items:center}
+  .reel-digit{height:42px;width:100%;display:flex;align-items:center;justify-content:center;font-family:Georgia,serif;font-size:22px;font-weight:500;color:var(--color-text-secondary);flex-shrink:0}
+  .reel-outer.locked .reel-digit.center{color:var(--color-text-primary)}
+  .reel-outer.locked{border-color:var(--color-border-primary)}
+  .lock-flash{position:absolute;inset:0;border-radius:8px;background:#D4CBBC;opacity:0;pointer-events:none;z-index:3;transition:opacity 0.2s}
+  .reel-outer.locked .lock-flash{opacity:1;animation:flashFade 0.5s forwards}
+  @keyframes flashFade{0%{opacity:0.6}100%{opacity:0}}
+</style>
+</head>
+<body>
+<div class="sm-wrap">
+  <div class="machine" id="machine">
+    <div class="reel-outer" id="r0"><div class="reel-window"></div><div class="reel-track" id="t0"></div><div class="lock-flash"></div></div>
+    <div class="reel-outer" id="r1"><div class="reel-window"></div><div class="reel-track" id="t1"></div><div class="lock-flash"></div></div>
+    <div class="reel-outer" id="r2"><div class="reel-window"></div><div class="reel-track" id="t2"></div><div class="lock-flash"></div></div>
+    <div class="reel-outer" id="r3"><div class="reel-window"></div><div class="reel-track" id="t3"></div><div class="lock-flash"></div></div>
+    <div class="reel-outer" id="r4"><div class="reel-window"></div><div class="reel-track" id="t4"></div><div class="lock-flash"></div></div>
+  </div>
+</div>
+<script>
+(function(){
+  const COLS=5,DIGIT_H=42,DIGITS=[0,1,2,3,4,5,6,7,8,9],REPEATS=8;
+  const targets=[8,2,6,1,9],speeds=[1.9,2.4,1.6,2.1,1.75];
+  const tracks=Array.from({length:COLS},(_,i)=>document.getElementById('t'+i));
+  const reels=Array.from({length:COLS},(_,i)=>document.getElementById('r'+i));
+  function buildTrack(track){
+    track.innerHTML='';
+    for(let r=0;r<REPEATS;r++) for(let d=0;d<10;d++){const div=document.createElement('div');div.className='reel-digit';div.textContent=d;track.appendChild(div);}
+    for(let d=0;d<5;d++){const div=document.createElement('div');div.className='reel-digit';div.textContent=d;track.appendChild(div);}
+  }
+  tracks.forEach(buildTrack);
+  const totalH=DIGITS.length*REPEATS*DIGIT_H;
+  const positions=speeds.map(()=>0);
+  let phase='spin',spinTime=0,lockStart=0,lockedCount=0,lastTs=null;
+  const SPIN_DURATION=3200,LOCK_INTERVAL=320,PAUSE_DURATION=1400;
+  const lockTargetPos=[];
+  function digitOffset(digit){return(Math.floor(REPEATS/2)*10+digit)*DIGIT_H;}
+  function applyPos(i,pos){const p=pos%totalH;tracks[i].style.transform=`translateY(${-(p+DIGIT_H*2)}px)`;}
+  function easeOut(t){return 1-(1-t)*(1-t)*(1-t);}
+  function loop(ts){
+    if(!lastTs) lastTs=ts;
+    const dt=Math.min(ts-lastTs,50);lastTs=ts;
+    if(phase==='spin'){
+      spinTime+=dt;
+      for(let i=0;i<COLS;i++){positions[i]=(positions[i]+speeds[i]*dt*0.18)%totalH;applyPos(i,positions[i]);}
+      if(spinTime>SPIN_DURATION){
+        phase='locking';lockStart=ts;lockedCount=0;
+        for(let i=0;i<COLS;i++){const t=targets[i];const cur=positions[i]%totalH;const blockLen=10*DIGIT_H;const targetOff=t*DIGIT_H;const curBlock=Math.floor(cur/blockLen)*blockLen;let tp=curBlock+targetOff;if(tp<cur)tp+=blockLen;tp+=blockLen*2;lockTargetPos[i]=tp;}
+      }
+    } else if(phase==='locking'){
+      const elapsed=ts-lockStart;const shouldLock=Math.floor(elapsed/LOCK_INTERVAL);
+      for(let i=0;i<COLS;i++){
+        if(i<lockedCount){applyPos(i,lockTargetPos[i]);continue;}
+        if(i<shouldLock&&i===lockedCount){positions[i]=lockTargetPos[i];applyPos(i,lockTargetPos[i]);reels[i].classList.add('locked');const flash=reels[i].querySelector('.lock-flash');void flash.offsetWidth;reels[i].classList.remove('locked');void flash.offsetWidth;reels[i].classList.add('locked');lockedCount++;continue;}
+        if(i>=lockedCount){positions[i]=(positions[i]+speeds[i]*dt*0.18)%totalH;applyPos(i,positions[i]);}
+      }
+      if(lockedCount>=COLS){phase='pause';lockStart=ts;}
+    } else if(phase==='pause'){
+      if(ts-lockStart>PAUSE_DURATION){reels.forEach(r=>r.classList.remove('locked'));phase='spin';spinTime=0;lastTs=null;}
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

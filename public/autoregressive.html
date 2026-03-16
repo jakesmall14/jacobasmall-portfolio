@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: transparent; width: 100%; height: 100%; overflow: hidden; }
+  :root {
+    --color-background-primary: #E8E2D9;
+    --color-background-secondary: #E0D9CE;
+    --color-border-primary: #C8BFB0;
+    --color-border-secondary: #C8BFB0;
+    --color-text-primary: #1A1814;
+    --color-text-secondary: #7A7268;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+  body { background: #E8E2D9; display: flex; align-items: center; justify-content: center; }
+  .ar-wrap{display:flex;align-items:center;justify-content:center;padding:2.5rem 1rem;gap:0}
+  .chip{width:52px;height:36px;border-radius:8px;background:var(--color-background-secondary);border:1.5px solid var(--color-border-secondary);opacity:0;display:flex;align-items:center;justify-content:center;margin:0 4px;transition:background 0.3s,border-color 0.3s}
+  .chip.show{opacity:1}
+  .chip.error{background:#FBEDEC;border-color:#C97B7A}
+  .ball{width:10px;height:10px;border-radius:50%;background:#1A1814;position:absolute;top:50%;transform:translateY(-50%);transition:left 0.35s cubic-bezier(.4,0,.2,1)}
+  .ar-row{position:relative;display:flex;align-items:center}
+</style>
+</head>
+<body>
+<div class="ar-wrap">
+  <div class="ar-row" id="ar-row">
+    <div class="chip" id="c0"></div>
+    <div class="chip" id="c1"></div>
+    <div class="chip" id="c2"></div>
+    <div class="chip" id="c3"></div>
+    <div class="chip" id="c4"></div>
+    <div class="chip" id="c5"></div>
+    <div class="chip" id="c6"></div>
+    <div class="ball" id="ball"></div>
+  </div>
+</div>
+<script>
+(function(){
+  const chips = Array.from({length:7},(_,i)=>document.getElementById('c'+i));
+  const ball = document.getElementById('ball');
+  const row = document.getElementById('ar-row');
+  function getChipCenter(i){
+    const chip = chips[i];
+    const rowRect = row.getBoundingClientRect();
+    const chipRect = chip.getBoundingClientRect();
+    return chipRect.left - rowRect.left + chipRect.width/2 - 5;
+  }
+  function reset(){
+    chips.forEach(c=>{c.classList.remove('show','error');});
+    ball.style.opacity='0';
+  }
+  function runSequence(){
+    reset();
+    const errorChips=[4,5,6];
+    let step=0;
+    const delays=[0,550,1100,1650,2200,2700,3200];
+    function showChip(i){
+      chips[i].classList.add('show');
+      if(errorChips.includes(i)) chips[i].classList.add('error');
+      ball.style.opacity='1';
+      ball.style.left = getChipCenter(i)+'px';
+    }
+    function tick(){
+      if(step>=7){
+        setTimeout(()=>{
+          ball.style.opacity='0';
+          setTimeout(runSequence,600);
+        },900);
+        return;
+      }
+      showChip(step);
+      step++;
+      setTimeout(tick, step<7 ? delays[step]-delays[step-1] : 500);
+    }
+    setTimeout(()=>{
+      ball.style.left = getChipCenter(0)+'px';
+      tick();
+    },200);
+  }
+  setTimeout(runSequence,100);
+})();
+</script>
+</body>
+</html>
